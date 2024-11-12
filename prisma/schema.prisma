@@ -1,0 +1,122 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id          String   @id @default(cuid())
+  name        String
+  location    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  storeProducts StoreProduct[]
+  transactions  Transaction[]
+
+  @@unique([name, location])
+  @@map("stores")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  basePrice   Decimal  @db.Decimal(10, 2)
+  sku         String   @unique
+  barcode     String?  @unique
+  category    String
+  description String?
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  storeProducts   StoreProduct[]
+  transactionItems TransactionItem[]
+
+  @@map("products")
+}
+
+model StoreProduct {
+  id              String   @id @default(cuid())
+  storeId         String
+  productId       String
+  currentQuantity Int      @default(0)
+  price           Decimal  @db.Decimal(10, 2)
+  minQuantity     Int      @default(0)
+  version         Int      @default(1)
+  lastSyncAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  store   Store   @relation(fields: [storeId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([storeId, productId])
+  @@index([storeId, productId])
+  @@map("store_products")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  storeId         String
+  customerId      String?
+  totalAmount     Decimal           @db.Decimal(10, 2)
+  paymentMethod   PaymentMethod
+  status          TransactionStatus
+  referenceNumber String            @unique
+  notes           String?
+  syncedAt        DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  store   Store             @relation(fields: [storeId], references: [id])
+  items   TransactionItem[]
+
+  @@index([storeId, createdAt])
+  @@index([referenceNumber])
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id            String   @id @default(cuid())
+  transactionId String
+  productId     String
+  quantity      Int
+  unitPrice     Decimal  @db.Decimal(10, 2)
+  totalPrice    Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+
+  @@index([transactionId])
+  @@map("transaction_items")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE_MONEY
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
